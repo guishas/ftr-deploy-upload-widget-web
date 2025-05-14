@@ -1,52 +1,95 @@
-name: Deploy to AWS S3
+name: Deploy to AWS S3 and Vercel
 
 on:
   push:
     branches:
       - main
 
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
 jobs:
-  deploy:
+  deploy-aws:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        id: checkout
+        id: checkout-aws
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        id: setup-node
+        id: setup-node-aws
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Install dependencies
-        id: install-dependencies
+        id: install-deps-aws
         run: npm ci
 
       - name: Build project
-        id: build
+        id: build-aws
         run: npm run build
 
-      - name: Configure AWS credentials
-        id: configure-aws-credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      # - name: Configure AWS credentials
+      #   id: configure-aws
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     aws-region: ${{ secrets.AWS_REGION }}
+
+      # - name: Deploy to S3
+      #   id: deploy-s3
+      #   run: |
+      #     aws s3 sync dist/ s3://${{ secrets.S3_BUCKET }} --delete
+
+      # - name: Deploy to S3 CDN
+      #   id: deploy-s3-cdn
+      #   run: |
+      #     aws s3 sync dist/ s3://${{ secrets.S3_CDN_BUCKET }} --delete
+
+      # - name: Invalidate CloudFront
+      #   id: invalidate-cf
+      #   run: |
+      #     aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+
+  deploy-vercel:
+    runs-on: ubuntu-latest
+    needs: deploy-aws
+
+    steps:
+      - name: Checkout code
+        id: checkout-vercel
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        id: setup-node-vercel
+        uses: actions/setup-node@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          node-version: 20
 
-      - name: Deploy to S3
-        id: deploy-s3
-        run: |
-          aws s3 sync dist/ s3://${{ secrets.S3_BUCKET }} --delete
+      - name: Install dependencies
+        id: install-deps-vercel
+        run: npm ci
 
-      - name: Deploy to S3 CDN
-        id: deploy-s3-cdn
-        run: |
-          aws s3 sync dist/ s3://${{ secrets.S3_CDN_BUCKET }} --delete
+      - name: Build project
+        id: build-vercel
+        run: npm run build
 
-      - name: Invalidate CloudFront
-        id: invalidate-cf
-        run: |
-          aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+      - name: Install Vercel CLI
+        id: install-vercel-cli
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel Environment Information
+        id: pull-vercel-env
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project Artifacts
+        id: build-vercel-artifacts
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel
+        id: deploy-vercel
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
