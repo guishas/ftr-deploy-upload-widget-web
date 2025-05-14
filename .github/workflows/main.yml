@@ -40,3 +40,8 @@ jobs:
         id: deploy-s3
         run: |
           aws s3 sync dist/ s3://${{ secrets.S3_BUCKET }} --delete
+
+      - name: Deploy to S3 CDN
+        id: deploy-s3-cdn
+        run: |
+          aws s3 sync dist/ s3://${{ secrets.S3_CDN_BUCKET }} --delete
